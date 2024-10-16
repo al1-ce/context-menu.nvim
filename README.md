@@ -3,11 +3,11 @@
 > This plugin is in its early stages, and the data structures is like to undergo significant changes over time.
 
 <p align="center">
-  <a href="https://github.com/LintaoAmons/context-menu.nvim?tab=readme-ov-file#philosophy">Philosophy</a>
+  <a href="https://github.com/LintaoAmons/context-menu.nvim?tab=readme-ov-file#philosophy">Philosophy (original repo)</a>
   ·
-  <a href="https://github.com/LintaoAmons/context-menu.nvim?tab=readme-ov-file#install--configuration">Install & Configuration</a>
+  <a href="https://github.com/al1-ce/context-menu.nvim?tab=readme-ov-file#install--configuration">Install & Configuration</a>
   ·
-  <a href="https://github.com/LintaoAmons/context-menu.nvim?tab=readme-ov-file#usecases">Usecases</a>
+  <a href="https://github.com/al1-ce/context-menu.nvim?tab=readme-ov-file#usecases">Usecases</a>
 </p>
 
 Instead of keymaps, you can put your actions in the context menu
@@ -18,54 +18,93 @@ Instead of keymaps, you can put your actions in the context menu
 - Adjust your config at runtime, simply source the setup function again
 - Local keymaps of the items
 
-  
+https://github.com/NvChad/menu/blob/main/lua/menu/init.lua
+https://github.com/NvChad/menu/tree/main
+
 ![show](https://github.com/user-attachments/assets/48cc708a-f989-4d66-9b0a-16e36ac8620d)
-
-
-## Philosophy
-
-- Minimise the cognitive overload in the head, but still put every functionality around you hand
-- Less keybindings but remian productivity
-- Configuration can be put in seperated spec files, and behaviour can be config at runtime and take effect immediately
 
 ## Install & Configuration
 
-> For more complex usecases, you can use [my config](https://github.com/LintaoAmons/CoolStuffes/blob/main/nvim/.config/nvim/lua/plugins/editor-core/context-menu.lua) as a reference
-
 ```lua
-local default_config = {
-  -- add menu_items, if you call setup function at multiple place, this field will merge together instead of overwrite
-  menu_items = {
-    {
-      cmd = "Run File",
-      order = 1,
-      not_ft = { "markdown" },
-      action = {
-        type = "callback",
-        callback = function(context)
-          if context.ft == "lua" then
-            return vim.cmd([[source %]])
-          elseif context.ft == "javascript" then
-            return vim.print("run javascript:: haven't impl yet")
-          end
-        end,
-      },
-    }
-  },
-  enable_log = true, -- Optional, enable error log be printed out. Turn it off if you don't want see those lines
-  default_action_keymaps = {
-    -- hint: if you have keymap set to trigger menu like:
-    -- vim.keymap.set({ "v", "n" }, "<M-l>", function() require("context-menu").trigger_context_menu() end, {})
-    -- You can put the same key here to close the menu, which results like a toggle menu key:
-    -- close_menu = { "q", "<ESC>", "<M-l>" },
-    close_menu = { "q", "<ESC>" },
-    trigger_action = { "<CR>", "o" },
-  },
-  ui = {
-    selected_item = { bg = "#244C55", fg = "white" },
-  },
+local custom_config = {
+    menu_items = {
+        {
+            name = "Run File", -- menu item name
+            ft = { "!markdown", "!text" }, -- ! ignores filetype
+            cmd = function(context) -- call function on confirm
+                if context.ft == "lua" then
+                    vim.cmd([[source %]])
+                elseif context.ft == "javascript" then
+                    vim.cmd("!node " .. vim.fn.expand("%:p"))
+                else
+                    vim.print("No run function for filetype")
+                end
+            end,
+        },
+        {
+            name = "Generate TOC",
+            ft = "markdown", -- show only for filetype (can be a single string)
+            cmd = "GenTocGFM" -- call vim command on confirm
+        },
+        {
+            name = "LSP",
+            cond = function() -- function condition
+                return #vim.lsp.get_clients({
+                    bufrn = vim.api.nvim_get_current_buf(),
+                }) ~= 0
+            end,
+            sub_menu = { -- open submenu on confirm (cmd will oveerride submenus)
+                {
+                    name = "Format",
+                    cmd = vim.lsp.buf.format,
+                },
+                { name = "Functions", separator = true }, -- named separator (----Functions----)
+                {
+                    name = "Definition",
+                    cmd = vim.lsp.buf.definition,
+                },
+                {
+                    name = "Implementation",
+                    cmd = vim.lsp.buf.implementation,
+                },
+                {
+                    name = "References",
+                    cmd = vim.lsp.buf.references,
+                },
+                { separator = true }, -- normal separator (-----------)
+                {
+                    name = "Find",
+                    cmd = "Lspsaga finder",
+                },
+            }
+        },
+        { separator = true },
+        {
+            name = "Edit Config",
+            hl = "String",
+            cmd = vim.cmd("e " .. vim.fn.stdpath("config")),
+            map = "ec" -- key mapping for confirming this menu item (will be display to the right)
+        }
+    },
+    debug = true, -- Optional, enable error log be printed out. Turn it off if you don't want see those lines
+    keymap = {
+        -- hint: if you have keymap set to trigger menu like:
+        -- vim.keymap.set({ "v", "n" }, "<M-l>", function() require("context-menu").trigger_context_menu() end, {})
+        -- You can put the same key here to close the menu, which results like a toggle menu key:
+        -- close_menu = { "q", "<ESC>", "<M-l>" },
+        close = { "q", "<ESC>" }, -- close menu
+        confirm = { "<CR>", "o" }, -- confirm/activate item
+        back = { "h", "<left>" } -- close submenu
+    },
+    window = {
+        style = "SignColumn", -- window background/foreground (can take table or hl group)
+        border = "double", -- border style
+        border_style = "Float",
+        cursor = { bg = "#244C55", fg = "white" }, -- selected item style
+        separator = "=", -- separator item style (========= instead of --------)
+        submenu = ">", -- submenu icon ( submenu    > )
+    },
 }
-
 ```
 
 <details>

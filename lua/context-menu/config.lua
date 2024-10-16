@@ -1,71 +1,46 @@
-local M = {}
+local _M = {}
 
----merge Items
----@param t1 ContextMenu.Items
----@param t2 ContextMenu.Items
----@return ContextMenu.Items
-local function merge_cmds(t1, t2)
-  local result = {}
-  -- Create a lookup table for the second table for quick access
-  local t2_lookup = {}
-  for _, item in ipairs(t2) do
-    t2_lookup[item.cmd] = item
-  end
-
-  -- Iterate over the first table
-  for _, item1 in ipairs(t1) do
-    local item2 = t2_lookup[item1.cmd]
-
-    if item2 then
-      if not item1.action then
-        error("Action is not found in menu_item [" .. item1.cmd .. "]")
-      end
-      if not item2.action then
-        error("Action is not found in menu_item [" .. item2.cmd .. "]")
-      end
-
-      local merged_item = item1
-
-      if item1.action.sub_cmds and item2.action.sub_cmds then
-        merged_item.action.sub_cmds = merge_cmds(item1.action.sub_cmds, item2.action.sub_cmds)
-      elseif item1.action.sub_cmds or item2.action.sub_cmds then
-        merged_item.action.sub_cmds = item1.action.sub_cmds or item2.action.sub_cmds
-      else
-        merged_item.action = item2.action
-      end
-
-      for k, v in pairs(item2) do
-        if k ~= "action" then
-          merged_item[k] = v
-        end
-      end
-
-      table.insert(result, merged_item)
-
-      t2_lookup[item1.cmd] = nil -- We used this item2, so remove it from lookup
-    else
-      table.insert(result, item1)
-    end
-  end
-
-  -- Add remaining items from t2 that weren't matched
-  for _, item in ipairs(t2) do
-    if t2_lookup[item.cmd] then
-      table.insert(result, item)
-    end
-  end
-
-  return result
+local utils = require("context-menu.utils");
+local style = require("context-menu.style");
+local log = require("context-menu.log");
+local function merge_or_keep(a, b)
+	if not b then
+		return a
+	end;
+	return vim.tbl_deep_extend("force", a, b)
+end;
+local function check_menu_items(items, parent_name)
+	do
+		local i = 0
+		while i < # items do
+			local item = items[i + 1];
+			if not item.name and not item.separator then
+				log.error(string.format([=[Child item of %s no. %s is missing name.]=], parent_name, i + 1));
+				return false
+			end;
+			if not item.cmd and not item.sub_menu then
+				log.error(string.format([=[Child item of %s no. %s is missing action (cmd or sub_menu).]=], parent_name, i + 1));
+				return false
+			end
+			i = i + 1
+		end
+	end;
+	return true
+end;
+local function setup(opts)
+	opts = opts or {};
+	local conf = vim.deepcopy(vim.g.context_menu_config);
+	conf.menu_items = opts.menu_items or conf.menu_items;
+	conf.debug = opts.debug or conf.debug;
+	conf.window = merge_or_keep(conf.window, opts.window);
+	conf.keymap = merge_or_keep(conf.debug, opts.debug);
+	utils.set_highlight(style.window_style, conf.window.style);
+	utils.set_highlight(style.cursor_style, conf.window.cursor);
+	utils.set_highlight(style.border_style, conf.window.border_style);
+	if not check_menu_items(conf.menu_items, "Context Menu") then
+		conf.menu_items = vim.g.context_menu_config.menu_items
+	end;
+	vim.g.context_menu_config = conf
 end
-
-M.setup = function(opts)
-  opts = opts or {}
-  local config = vim.deepcopy(vim.g.context_menu_config)
-  if opts.menu_items then
-    config.menu_items = merge_cmds(config.menu_items, opts.menu_items)
-  end
-
-  vim.g.context_menu_config = config
-end
-
-return M
+_M.setup = setup
+return _M
